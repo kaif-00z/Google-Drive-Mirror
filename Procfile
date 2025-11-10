@@ -1,0 +1,1 @@
+web: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers $(($(nproc) * 2)) --host=0.0.0.0 --port=${PORT:-5000} --timeout 300
