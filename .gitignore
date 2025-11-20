@@ -1,4 +1,6 @@
 __pycache__/
 .env
+test.*
 *.pickle
+*.log
 accounts/

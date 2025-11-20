@@ -5,7 +5,10 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-# workers
-WORKERS=$(( $(nproc) * 2 ))
-
-gunicorn main:app -k uvicorn.workers.UvicornWorker --workers $WORKERS --bind ${HOST:-0.0.0.0}:${PORT:-5000} --timeout 300
+# runner
+gunicorn main:app -k uvicorn.workers.UvicornWorker \
+    --bind ${HOST:-0.0.0.0}:${PORT:-5000} \
+    --preload \
+    --max-requests ${MAX_REQ_BUFFER:-1000} \
+    --max-requests-jitter $(( ${MAX_REQ_BUFFER:-1000} / 10 )) \
+    --workers $(( $(nproc) * 2 + 1 ))

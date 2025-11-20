@@ -1,13 +1,13 @@
-# 🧪 Kjeldahl Indexer & Streamer
+# 🧪 Google Drive Indexer & Streamer
 
 > High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.
 
 [![Python](https://img.shields.io/badge/Python-v3.14.0-blue)](https://www.python.org/)
-[![CodeFactor](https://www.codefactor.io/repository/github/kaif-00z/Kjeldahl/badge)](https://www.codefactor.io/repository/github/kaif-00z/Kjeldahl)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/kaif-00z/Kjeldahl/graphs/commit-activity)
-[![Contributors](https://img.shields.io/github/contributors/kaif-00z/Kjeldahl?style=flat-square&color=green)](https://github.com/kaif-00z/Kjeldahl/graphs/contributors)
+[![CodeFactor](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror/badge)](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/kaif-00z/Google-Drive-Mirror/graphs/commit-activity)
+[![Contributors](https://img.shields.io/github/contributors/kaif-00z/Google-Drive-Mirror?style=flat-square&color=green)](https://github.com/kaif-00z/Google-Drive-Mirror/graphs/contributors)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://makeapullrequest.com)
-[![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://github.com/kaif-00z/Kjeldahl/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://github.com/kaif-00z/Google-Drive-Mirror/blob/main/LICENSE)
 
 ## How to deploy?
 
@@ -16,13 +16,13 @@
 
 ### Deployment In VPS
 
-- `git clone https://github.com/kaif-00z/Kjeldahl.git`
+- `git clone https://github.com/kaif-00z/Google-Drive-Mirror.git`
 
-- `nano .env` configure env as per [this](https://github.com/kaif-00z/Kjeldahl/blob/main/.sample.env)
+- `nano .env` configure env as per [this](https://github.com/kaif-00z/Google-Drive-Mirror/blob/main/.sample.env)
 
-- `sudo docker build . -t kjeldahl` (make sure to install docker first using `sudo apt install docker.io`)
+- `sudo docker build . -t gmirror` (make sure to install docker first using `sudo apt install docker.io`)
 
-- `sudo docker run -p 5000:5000 kjeldahl` (make sure to change port if you are using custom port)
+- `sudo docker run -p 5000:5000 gmirror:latest` (make sure to change port if you are using custom port)
 
 ## Generating Configs & Stuffs
 
@@ -181,7 +181,7 @@ python3 add_to_team_drive.py -d SharedTeamDriveSrcID
 
 # License
 [![License](https://www.gnu.org/graphics/agplv3-155x51.png)](LICENSE)   
-Kjeldahl is licensed under [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.en.html) v3 or later.
+Google-Drive-Mirror is licensed under [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.en.html) v3 or later.
 
 # Credits
 * [Me](https://github.com/kaif-00z)
