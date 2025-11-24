@@ -152,7 +152,7 @@ class GoogleDriver:
                 LOGGER.error(f"Streaming error: {str(err)}")
                 raise err
 
-
+    @timed_cache(seconds=600) # 10mins is good for this
     async def get_file_info(self, file_id) -> dict:
         try:
             file_id = file_id.strip()
@@ -170,6 +170,7 @@ class GoogleDriver:
             LOGGER.error(f"Error getting file info: {str(err)}")
             raise err
 
+    @timed_cache(seconds=120) # 2 mins
     async def list_all(self, folder_id: str = Var.ROOT_FOLDER_ID, page_token: str = None, page_size: int = 100):
         all_items = []
         info = {
@@ -276,6 +277,7 @@ class GoogleDriver:
         await _list_folder()
         return all_items, info
 
+    @timed_cache(seconds=300) # 5mins
     async def search_files_in_drive(self, query: str, page_token=None, page_size=100):
         all_items = []
         info = {
@@ -394,7 +396,7 @@ class GoogleDriver:
         return all_items, info
 
 
-# to get new driver instance in every 10mins
-@timed_cache(seconds=600)
+# to get new driver instance in every 30mins
+@timed_cache(seconds=1800)
 def get_drive_client() -> GoogleDriver:
     return GoogleDriver()
