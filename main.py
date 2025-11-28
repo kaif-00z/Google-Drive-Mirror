@@ -140,12 +140,13 @@ async def media_streamer(request: Request, file_id: str):
 
     return StreamingResponse(
         status_code=206 if range_header else 200,
-        content=client._stream_file(file_id),
+        content=client.stream_file(file_id),
         headers={
             "Content-Type": f"{mime_type}",
             "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
             "Content-Length": str(req_length),
             "Content-Disposition": f'{disposition}; filename="{file_name}"',
+            "Transfer-Encoding": "chunked",
             "Accept-Ranges": "bytes",
         },
     )
