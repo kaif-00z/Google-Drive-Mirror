@@ -9,10 +9,9 @@
 # credit to t.me/kAiF_00z (github.com/kaif-00z)
 
 import logging
-import mimetypes
 from traceback import format_exc
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi import HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -20,7 +19,6 @@ from fastapi.openapi.docs import get_swagger_ui_html
 
 from gdrive import get_drive_client
 from models import SearchResponse, FileFolderResponse, FilesFoldersListResponse,  Optional
-from models import FileNotFound
 
 
 logging.basicConfig(
@@ -60,96 +58,31 @@ async def overridden_swagger():
 
 @app.get("/dl/{file_id}", include_in_schema=False)
 async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
-    try:
-        if not file_id or len(file_id) < 5:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid file ID format"
-            )
+    if not file_id or len(file_id) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file ID format"
+        )
         
-        # client_ip = request.client.host
-        # log.info(f"Stream request for file {file_id} from IP {client_ip}")
+    client_ip = request.client.host
+    log.info(f"Stream request for file {file_id} from IP {client_ip}")
 
-        return await media_streamer(request, file_id)
-    except FileNotFound as e:
-        log.warning(f"File not found: {file_id}, reason: {getattr(e, 'reason', str(e))}")
-        return Response(
-            content=f"File not found: {getattr(e, 'reason', 'File does not exist')}",
-            status_code=status.HTTP_404_NOT_FOUND
-        )
-    except ConnectionResetError:
-        log.info(f"Client disconnected during stream: {file_id}")
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except AttributeError as e:
-        log.error(f"Attribute error for file {file_id}: {str(e)}")
-        return Response(
-            content="Invalid file data structure",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-    except HTTPException:
-        raise
+    try:
+        client = get_drive_client()
+        file_info = await client.get_file_info(file_id)
+    except HTTPException as err:
+        raise err
     except Exception as e:
         log.error(
             f"Unexpected error streaming file {file_id}: {str(e)}\n"
             f"Traceback: {format_exc()}"
         )
-        return Response(
-            content="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(
+            status_code=getattr(e, 'status', status.HTTP_500_INTERNAL_SERVER_ERROR), 
+            detail=getattr(e, 'reason', str(e))
         )
 
-
-async def media_streamer(request: Request, file_id: str):
-    range_header = request.headers.get("Range", 0)
-    log.info(
-        f"now serving {request.headers.get('X-FORWARDED-FOR')}"
-    )
-
-    try:
-        client = get_drive_client()
-        file_info = await client.get_file_info(file_id)
-    except Exception as error:
-        raise FileNotFound(error)
-
-    file_size = file_info.get("size")
-
-    if range_header:
-        from_bytes, until_bytes = range_header.replace("bytes=", "").split("-")
-        from_bytes = int(from_bytes)
-        until_bytes = int(until_bytes) if until_bytes else file_size - 1
-    else:
-        from_bytes = 0
-        until_bytes = file_size - 1
-
-    if (until_bytes > file_size) or (from_bytes < 0) or (until_bytes < from_bytes):
-        return Response(
-            status_code=416,
-            content="416: Range not satisfiable",
-            headers={"Content-Range": f"bytes */{file_size}"},
-        )
-
-    until_bytes = min(until_bytes, file_size - 1)
-    req_length = until_bytes - from_bytes + 1
-
-    mime_type = file_info.get("mimeType")
-    file_name = file_info.get("name")
-    disposition = "attachment"
-
-    if not mime_type:
-        mime_type = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
-
-    return StreamingResponse(
-        status_code=206 if range_header else 200,
-        content=client.stream_file(file_id),
-        headers={
-            "Content-Type": f"{mime_type}",
-            "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
-            "Content-Length": str(req_length),
-            "Content-Disposition": f'{disposition}; filename="{file_name}"',
-            "Transfer-Encoding": "chunked",
-            "Accept-Ranges": "bytes",
-        },
-    )
+    return await client.stream_file(file_id.strip(), file_info, request.headers.get("Range", 0))
 
 
 @app.get("/info", response_model=FileFolderResponse)

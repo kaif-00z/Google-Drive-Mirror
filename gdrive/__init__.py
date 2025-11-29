@@ -10,15 +10,18 @@
 # only base (like login & sa management)
 # everything else written by me@kaif-00z under AGPLv3 license
 
-from logging import getLogger, ERROR
+import aiohttp, mimetypes
+from logging import getLogger, WARNING
 from pickle import load as pload
 from os import path as ospath, listdir
-from io import BytesIO
 from random import randrange
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaIoBaseDownload
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
+from urllib.parse import urlencode
+import requests
 
 from libs.time_cache import timed_cache
 
@@ -30,8 +33,7 @@ from .utils import (
 from .config import Var
 
 LOGGER = getLogger(__name__)
-getLogger("googleapiclient.discovery").setLevel(ERROR)
-
+getLogger("googleapiclient.discovery").setLevel(WARNING)
 
 class GoogleDriver:
     def __init__(self):
@@ -40,12 +42,12 @@ class GoogleDriver:
         self.__sa_index = 0
         self.__sa_count = 1
         self.__sa_number = 100
+        self.__token = {}
         self.__service = self.__authorize()
 
     def __authorize(self):
         credentials = None
-        if Var.IS_SERVICE_ACCOUNT:
-            json_files = listdir("accounts")
+        if Var.IS_SERVICE_ACCOUNT and (json_files := listdir("accounts")):
             self.__sa_number = len(json_files)
             self.__sa_index = randrange(self.__sa_number)
             LOGGER.info(
@@ -54,14 +56,46 @@ class GoogleDriver:
             credentials = service_account.Credentials.from_service_account_file(
                 f"accounts/{json_files[self.__sa_index]}", scopes=self.__OAUTH_SCOPE
             )
+            self.__token[self.__sa_index] = credentials.token
         elif ospath.exists("token.pickle"):
             LOGGER.info("Authorize with token.pickle")
             with open("token.pickle", "rb") as f:
                 credentials = pload(f)
+                self.__token["pickle"] = self._fetch_access_token(credentials)
         else:
             LOGGER.error("token.pickle not found nor service accounts if any!")
         return build("drive", "v3", credentials=credentials, cache_discovery=False)
+    
+    def _fetch_access_token(self, credentials):
+        url = "https://www.googleapis.com/oauth2/v4/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
+        # Normal OAuth refresh-token mode
+        post_data = {
+            "client_id": credentials.client_id,
+            "client_secret": credentials.client_secret,
+            "refresh_token": credentials.refresh_token,
+            "grant_type": "refresh_token",
+        }
+
+        body = urlencode(post_data)
+
+        # Retry logic (3 attempts)
+        response = None
+        for i in range(3):
+            response = requests.post(url, headers=headers, data=body)
+            if response.status_code == 200:
+                break
+
+        if response is None:
+            raise RuntimeError("Failed to fetch access token") 
+
+        return response.json().get("access_token")
+    
+    def _get_token(self):
+        if Var.IS_SERVICE_ACCOUNT:
+            return self.__token.get(self.__sa_index)
+        return self.__token.get("pickle")
 
     @run_async
     def __switchServiceAccount(self):
@@ -85,72 +119,75 @@ class GoogleDriver:
             .execute()
         )
 
-    async def stream_file(
-        self,
-        file_id,
-        chunk_size=Var.SERVER_SIDE_SPEED * 1024 * 1024,
-    ):
-        
-        file_id = file_id.strip()
+    
+    async def stream_file(self, file_id: str, file: dict, range_header: int = 0):
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 
-        @run_async
-        def _create_request():
-            return self.__service.files().get_media(
-                fileId=file_id,
-                supportsAllDrives=True
-            )
-        
-        @run_async
-        def _get_next_chunk(ddl):
-            return ddl.next_chunk()
-        
-        request = await _create_request()
-        buffer = BytesIO()
-        downloader = MediaIoBaseDownload(buffer, request, chunksize=chunk_size)
-        
-        done = False
-        retries = 0
+        file_name = file["name"]
+        file_size = file.get("size")
+        mime_type = file.get("mime_type")
 
-        while not done:
+        headers = {"Authorization": f"Bearer {self._get_token()}"}
+        if range_header:
+            headers["Range"] = str(range_header)
+
+        res = None
+        session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None))
+        for attempt in range(3):
             try:
-                
-                status, done = await _get_next_chunk(downloader)
-                
-                buffer.seek(0)
-
-                chunk_data = buffer.read()
-                yield chunk_data
-
-                buffer.seek(0)
-                buffer.truncate()
-                retries = 0
-
-            except HttpError as err:
-                if err.resp.status in [500, 502, 503, 504] and retries < 10:
-                    retries += 1
-                    await asyncio.sleep(2)
-                    continue
-                
-                if err.resp.get("content-type", "").startswith("application/json"):
-                    try:
-                        error_data = eval(err.content)
-                        reason = error_data.get("error", {}).get("errors", [{}])[0].get("reason")
-                        if reason in ["downloadQuotaExceeded", "dailyLimitExceeded"]:
-                            if self.__sa_count < self.__sa_number:
-                                LOGGER.info(f"Got {reason}, switching service account...")
-                                await self.__switchServiceAccount()
-                                # restart the entire stream?
-                                async for chunk in self.stream_file(file_id):
-                                    yield chunk
-                            else:
-                                raise Exception(f"All service accounts quota exceeded: {reason}")
-                    except Exception as er:
-                        raise er
-                else: raise err
-            
+                res = await session.get(url, headers=headers)
+                if res.status in (200, 206):
+                    break
             except Exception as err:
-                LOGGER.error(f"Streaming error: {str(err)}")
-                raise err
+                LOGGER.error(str(err))
+
+        if res is None:
+            raise HTTPException(500, "Unknown error while contacting Google Drive")
+
+        if res.status == 404:
+            raise HTTPException(404, "File Not Found")
+
+        if res.status == 403:
+            details = await res.text()
+            raise HTTPException(403, details)
+
+        if res.status not in (200, 206):
+            details = await res.text()
+            raise HTTPException(res.status, details)
+
+        async def stream():
+            try:
+                async for chunk in res.content.iter_chunked(1024 * 1024):
+                    if chunk:
+                        yield chunk
+            except BaseException as e:
+                if isinstance(e, asyncio.CancelledError):
+                    LOGGER.warning(f"Client disconnected while streaming file {file_id}")
+                else:
+                    LOGGER.error(f"Stream error: {e}")
+                raise
+            finally:
+                await session.close()
+
+        response = StreamingResponse(
+            content=stream(),
+            media_type=mime_type
+        )
+
+        response.headers["Content-Disposition"] = f'attachment; filename="{file_name}"'
+
+        if not range_header and file_size:
+            response.headers["Content-Length"] = str(file_size)
+
+        if res.status == 206:
+            response.status_code = 206
+            for h in ["Content-Range", "Accept-Ranges"]:
+                if h in res.headers:
+                    response.headers[h] = res.headers[h]
+        else:
+            response.status_code = 200
+
+        return response
 
     @timed_cache(seconds=600) # 10mins is good for this
     async def get_file_info(self, file_id) -> dict:
@@ -159,10 +196,12 @@ class GoogleDriver:
             
             meta = await self.__getFileMetadata(file_id)
 
+            mime_type = meta.get("mimeType") or mimetypes.guess_type(meta["name"])[0] or "application/octet-stream"
+
             return {
                 "name": meta["name"],
                 "id": meta["id"],
-                "mime_type": meta.get("mimeType"),
+                "mime_type": mime_type,
                 "size": int(meta.get("size", 0)),
                 "type": "folder" if meta.get("mimeType") == self.__G_DRIVE_DIR_MIME_TYPE else "file"
             }
@@ -376,3 +415,5 @@ class GoogleDriver:
 @timed_cache(seconds=1800)
 def get_drive_client() -> GoogleDriver:
     return GoogleDriver()
+
+t = GoogleDriver()
