@@ -20,6 +20,8 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from gdrive import AsyncGoogleDriver
 from models import SearchResponse, FileFolderResponse, FilesFoldersListResponse,  Optional
 
+from contextlib import asynccontextmanager
+
 
 logging.basicConfig(
     format="%(asctime)s || %(name)s [%(levelname)s] : %(message)s",
@@ -32,10 +34,21 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+global driver
+
+@asynccontextmanager
+async def lifespan(app):
+    global driver
+    driver = AsyncGoogleDriver()
+    await driver._load_accounts()
+    yield
+    await driver._close_req_session()
+
 app = FastAPI(
     title="Google Drive Mirror",
     summary="High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.",
     version="v0.0.1@beta.2ps",
+    lifespan=lifespan,
     docs_url=None,
     redoc_url=None,
 )
@@ -47,8 +60,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-driver = AsyncGoogleDriver()
 
 @app.get("/", include_in_schema=False)
 async def overridden_swagger():
@@ -111,11 +122,10 @@ async def file_info(
 @app.get("/folders/list", response_model=FilesFoldersListResponse)
 async def folders_in_root(
     folder_id: Optional[str] = Query(None, description="Google Drive folder ID (optional, defaults to root)"),
-    page_size: int = Query(100, ge=1, le=50, description="Number of items per page"),
+    page_size: int = Query(50, ge=1, le=50, description="Number of items per page"),
     page_token: Optional[str] = Query(None, description="Pagination token for next page")
 ):
     try:
-        await driver._load_accounts()
         data = await driver.list_all(page_token=page_token, page_size=page_size) if not folder_id else await driver.list_all(folder_id=folder_id, page_token=page_token, page_size=page_size)
         return JSONResponse(
             {
@@ -136,7 +146,7 @@ async def folders_in_root(
 @app.get("/search", response_model=SearchResponse)
 async def search(
     query: str = Query(..., min_length=3, description="Search query"),
-    page_size: int = Query(100, ge=1, le=50, description="Number of results per page"),
+    page_size: int = Query(50, ge=1, le=50, description="Number of results per page"),
     page_token: Optional[str] = Query(None, description="Pagination token for next page")
 ):
     try:

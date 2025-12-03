@@ -39,8 +39,6 @@ class AsyncGoogleDriver:
         self.__credntials = None
         self.__pickle_access_token = None
 
-        asyncio.create_task(self._load_accounts())
-
     async def _async_searcher(
         self,
         url: str,
@@ -327,6 +325,3 @@ class AsyncGoogleDriver:
         
     async def _close_req_session(self):
         await self._requests_sessions.close()
-
-    def __del__(self):
-        asyncio.create_task(self._close_req_session())

@@ -3,7 +3,9 @@ google-auth-httplib2
 google-auth-oauthlib
 oauth2client
 python-decouple
+pyjwt
 fastapi==0.120.0
 uvicorn==0.38.0
 gunicorn==23.0.0
-aiohttp==3.13.2
+aiohttp
+aiofiles
