@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 
-from gdrive import get_drive_client
+from gdrive import AsyncGoogleDriver
 from models import SearchResponse, FileFolderResponse, FilesFoldersListResponse,  Optional
 
 
@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 app = FastAPI(
     title="Google Drive Mirror",
     summary="High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.",
-    version="v0.0.1@beta.1ps",
+    version="v0.0.1@beta.2ps",
     docs_url=None,
     redoc_url=None,
 )
@@ -47,6 +47,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+driver = AsyncGoogleDriver()
 
 @app.get("/", include_in_schema=False)
 async def overridden_swagger():
@@ -68,8 +70,7 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
     log.info(f"Stream request for file {file_id} from IP {client_ip}")
 
     try:
-        client = get_drive_client()
-        file_info = await client.get_file_info(file_id)
+        file_info = await driver.get_file_info(file_id)
     except HTTPException as err:
         raise err
     except Exception as e:
@@ -82,7 +83,7 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
             detail=getattr(e, 'reason', str(e))
         )
 
-    return await client.stream_file(file_id.strip(), file_info, request.headers.get("Range", 0))
+    return await driver.stream_file(file_id.strip(), file_info, request.headers.get("Range", 0))
 
 
 @app.get("/info", response_model=FileFolderResponse)
@@ -90,8 +91,7 @@ async def file_info(
     file_id: str = Query(..., description="Google Drive file or folder ID")
 ):
     try:
-        client = get_drive_client()
-        data = await client.get_file_info(file_id)
+        data = await driver.get_file_info(file_id)
         return JSONResponse(
             {
                 "success": True,
@@ -111,20 +111,16 @@ async def file_info(
 @app.get("/folders/list", response_model=FilesFoldersListResponse)
 async def folders_in_root(
     folder_id: Optional[str] = Query(None, description="Google Drive folder ID (optional, defaults to root)"),
-    page_size: int = Query(100, ge=1, le=100, description="Number of items per page"),
+    page_size: int = Query(100, ge=1, le=50, description="Number of items per page"),
     page_token: Optional[str] = Query(None, description="Pagination token for next page")
 ):
     try:
-        client = get_drive_client()
-        data, info = (
-            await client.list_all(page_token=page_token, page_size=page_size) if not folder_id 
-            else await client.list_all(folder_id=folder_id, page_token=page_token, page_size=page_size)
-        )
+        await driver._load_accounts()
+        data = await driver.list_all(page_token=page_token, page_size=page_size) if not folder_id else await driver.list_all(folder_id=folder_id, page_token=page_token, page_size=page_size)
         return JSONResponse(
             {
                 "success": True,
                 "data": data,
-                "additional_info": info
             }
         )
     except BaseException as e:
@@ -140,17 +136,15 @@ async def folders_in_root(
 @app.get("/search", response_model=SearchResponse)
 async def search(
     query: str = Query(..., min_length=3, description="Search query"),
-    page_size: int = Query(100, ge=1, le=100, description="Number of results per page"),
+    page_size: int = Query(100, ge=1, le=50, description="Number of results per page"),
     page_token: Optional[str] = Query(None, description="Pagination token for next page")
 ):
     try:
-        client = get_drive_client()
-        data, info = await client.search_files_in_drive(query, page_token=page_token, page_size=page_size)
+        data = await driver.search_files_in_drive(query, page_token=page_token, page_size=page_size)
         return JSONResponse(
             {
                 "success": True,
                 "data": data,
-                "additional_info": info
             }
         )
     except BaseException as e:
