@@ -8,6 +8,7 @@
 
 from decouple import config
 
+
 class Var:
     IS_SERVICE_ACCOUNT = config("IS_SERVICE_ACCOUNT", default=False, cast=bool)
     ROOT_FOLDER_ID = config("ROOT_FOLDER_ID")

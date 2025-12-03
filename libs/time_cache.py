@@ -9,10 +9,10 @@
 # GitHub: https://github.com/1Danish-00
 # ------------------------------------------
 
-import time
+import asyncio
 import functools
 import inspect
-import asyncio
+import time
 from typing import Any, Callable, Dict, Tuple
 
 

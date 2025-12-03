@@ -9,19 +9,21 @@
 # credit to t.me/kAiF_00z (github.com/kaif-00z)
 
 import logging
+from contextlib import asynccontextmanager
 from traceback import format_exc
 
-from fastapi import FastAPI, Request
-from fastapi import HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from gdrive import AsyncGoogleDriver
-from models import SearchResponse, FileFolderResponse, FilesFoldersListResponse,  Optional
-
-from contextlib import asynccontextmanager
-
+from models import (
+    FileFolderResponse,
+    FilesFoldersListResponse,
+    Optional,
+    SearchResponse,
+)
 
 logging.basicConfig(
     format="%(asctime)s || %(name)s [%(levelname)s] : %(message)s",
@@ -36,6 +38,7 @@ log = logging.getLogger(__name__)
 
 global driver
 
+
 @asynccontextmanager
 async def lifespan(app):
     global driver
@@ -43,6 +46,7 @@ async def lifespan(app):
     await driver._load_accounts()
     yield
     await driver._close_req_session()
+
 
 app = FastAPI(
     title="Google Drive Mirror",
@@ -61,6 +65,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/", include_in_schema=False)
 async def overridden_swagger():
     return get_swagger_ui_html(
@@ -69,24 +74,24 @@ async def overridden_swagger():
         swagger_favicon_url="https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png",
     )
 
+
 @app.get("/dl/{file_id}", include_in_schema=False)
 async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
     if not file_id or len(file_id) < 5:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file ID format"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file ID format"
         )
-        
+
     client_ip = request.client.host
     log.info(f"Stream request for file {file_id} from IP {client_ip}")
 
     try:
         file_info = await driver.get_file_info(file_id)
-        
+
         if file_info.get("mimeType") == "application/vnd.google-apps.folder":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No Feature to download a folder!"
+                detail="No Feature to download a folder!",
             )
     except HTTPException as err:
         raise err
@@ -96,11 +101,13 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
             f"Traceback: {format_exc()}"
         )
         raise HTTPException(
-            status_code=getattr(e, 'status', status.HTTP_500_INTERNAL_SERVER_ERROR), 
-            detail=getattr(e, 'reason', str(e))
+            status_code=getattr(e, "status", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            detail=getattr(e, "reason", str(e)),
         )
 
-    return await driver.stream_file(file_id.strip(), file_info, request.headers.get("Range", 0))
+    return await driver.stream_file(
+        file_id.strip(), file_info, request.headers.get("Range", 0)
+    )
 
 
 @app.get("/info", response_model=FileFolderResponse)
@@ -117,22 +124,34 @@ async def file_info(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=getattr(e.resp, 'status', status.HTTP_500_INTERNAL_SERVER_ERROR),
+            status_code=getattr(
+                e.resp, "status", status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail={
                 "success": False,
-                "error": getattr(e, 'reason', str(e)),
-            }
+                "error": getattr(e, "reason", str(e)),
+            },
         )
 
 
 @app.get("/folders/list", response_model=FilesFoldersListResponse)
 async def folders_in_root(
-    folder_id: Optional[str] = Query(None, description="Google Drive folder ID (optional, defaults to root)"),
+    folder_id: Optional[str] = Query(
+        None, description="Google Drive folder ID (optional, defaults to root)"
+    ),
     page_size: int = Query(50, ge=1, le=50, description="Number of items per page"),
-    page_token: Optional[str] = Query(None, description="Pagination token for next page")
+    page_token: Optional[str] = Query(
+        None, description="Pagination token for next page"
+    ),
 ):
     try:
-        data = await driver.list_all(page_token=page_token, page_size=page_size) if not folder_id else await driver.list_all(folder_id=folder_id, page_token=page_token, page_size=page_size)
+        data = (
+            await driver.list_all(page_token=page_token, page_size=page_size)
+            if not folder_id
+            else await driver.list_all(
+                folder_id=folder_id, page_token=page_token, page_size=page_size
+            )
+        )
         return JSONResponse(
             {
                 "success": True,
@@ -141,11 +160,11 @@ async def folders_in_root(
         )
     except BaseException as e:
         raise HTTPException(
-            status_code=getattr(e, 'status', status.HTTP_500_INTERNAL_SERVER_ERROR),
+            status_code=getattr(e, "status", status.HTTP_500_INTERNAL_SERVER_ERROR),
             detail={
                 "success": False,
-                "error": getattr(e, 'reason', str(e)),
-            }
+                "error": getattr(e, "reason", str(e)),
+            },
         )
 
 
@@ -153,10 +172,14 @@ async def folders_in_root(
 async def search(
     query: str = Query(..., min_length=3, description="Search query"),
     page_size: int = Query(50, ge=1, le=50, description="Number of results per page"),
-    page_token: Optional[str] = Query(None, description="Pagination token for next page")
+    page_token: Optional[str] = Query(
+        None, description="Pagination token for next page"
+    ),
 ):
     try:
-        data = await driver.search_files_in_drive(query, page_token=page_token, page_size=page_size)
+        data = await driver.search_files_in_drive(
+            query, page_token=page_token, page_size=page_size
+        )
         return JSONResponse(
             {
                 "success": True,
@@ -165,9 +188,11 @@ async def search(
         )
     except BaseException as e:
         raise HTTPException(
-            status_code=getattr(e.resp, 'status', status.HTTP_500_INTERNAL_SERVER_ERROR),
+            status_code=getattr(
+                e.resp, "status", status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail={
                 "success": False,
-                "error": getattr(e, 'reason', str(e)),
-            }
+                "error": getattr(e, "reason", str(e)),
+            },
         )
