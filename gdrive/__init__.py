@@ -43,7 +43,6 @@ class AsyncGoogleDriver:
         self.__service_accounts_identifiers = []
         # for normal account
         self.__credntials = None
-        self.__pickle_access_token = None
 
     async def _async_searcher(
         self,
@@ -80,15 +79,19 @@ class AsyncGoogleDriver:
             procs = [self._lazy_load_sa(sa) for sa in glob("accounts/*.json")]
             await asyncio.gather(*procs)
         elif os.path.exists("token.pickle"):
-            async with aiofiles.open("token.pickle", "rb") as t:
-                data = pickle.loads(await t.read())
-                self.__credntials = {
-                    "client_id": data.client_id,
-                    "client_secret": data.client_secret,
-                    "refresh_token": data.refresh_token,
-                    "grant_type": "refresh_token",
-                }
-                self.__credntials = base64.b64encode(json.dumps(self.__credntials).encode()).decode()
+            await self._lazy_load_pickle()
+
+    async def _lazy_load_pickle(self):
+        async with aiofiles.open("token.pickle", "rb") as t:
+            data = pickle.loads(await t.read())
+            self.__credntials = {
+                "client_id": data.client_id,
+                "client_secret": data.client_secret,
+                "refresh_token": data.refresh_token,
+                "grant_type": "refresh_token",
+            }
+            return self.__credntials
+        
 
     async def _lazy_load_sa(self, file_path: str) -> dict:
         if data := self.__service_accounts_data.get(file_path):
@@ -112,18 +115,20 @@ class AsyncGoogleDriver:
         }
         return jwt.encode(payload, private_key, algorithm="RS256")
 
-    @timed_cache(seconds=3500) # every sa token is valid for 1hr so...
-    async def _fetch_token(self, credentials: str, is_service_account: bool = False):
-        credentials = json.loads(base64.b64decode(credentials).decode())
+    # actually both sa's access token and pickle's refresh token expire after 1hr or 3600s
+    # so caching it for 58mins :)
+    @timed_cache(seconds=3500)
+    async def _fetch_token(self, credentials: str = None, is_service_account: bool = False):
 
-        if is_service_account:
+        if is_service_account and credentials:
+            credentials = json.loads(base64.b64decode(credentials).decode())
             _jwt_payload = await self._generate_gcp_jwt(credentials)
             payload = {
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 "assertion": _jwt_payload,
             }
         else:
-            payload = credentials
+            payload = await self._lazy_load_pickle()
 
         for i in range(3):
             res = await self._async_searcher(
@@ -138,10 +143,8 @@ class AsyncGoogleDriver:
         raise FailedToFetchToken("Failed to fetch access token")
 
     async def _get_token(self, retry: int = 0):
-        if self.__credntials:
-            if not self.__pickle_access_token:
-                self.__pickle_access_token = await self._fetch_token(self.__credntials)
-            return self.__pickle_access_token
+        if self.__credntials :
+            return await self._fetch_token()
 
         if Var.IS_SERVICE_ACCOUNT and self.__service_accounts_data:
             if not self.__service_accounts_identifiers:
