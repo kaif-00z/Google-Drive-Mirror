@@ -82,6 +82,12 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
 
     try:
         file_info = await driver.get_file_info(file_id)
+        
+        if file_info.get("mimeType") == "application/vnd.google-apps.folder":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No Feature to download a folder!"
+            )
     except HTTPException as err:
         raise err
     except Exception as e:

@@ -278,7 +278,7 @@ class AsyncGoogleDriver:
         raise FailedToFetchFilesTree(res)
     
     @timed_cache(seconds=300) # 5mins
-    async def search_files_in_drive(self, query: str, page_token=None, page_size=100):
+    async def search_files_in_drive(self, query: str, page_token=None, page_size=50):
         query = query.strip().replace("'", "\\'")
 
         words = query.split()
