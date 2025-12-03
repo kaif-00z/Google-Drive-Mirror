@@ -5,7 +5,7 @@
 # PLease read the GNU Affero General Public License in
 # <https://github.com/kaif-00z/Google-Drive-Mirror/blob/main/LICENSE>.
 
-# inspired from google-drive-index
+# inspired from https://gitlab.com/GoogleDriveIndex/Google-Drive-Index (serverless JS)
 
 # if you are using this following code then don't forgot to give proper
 # credit to t.me/kAiF_00z (github.com/kaif-00z)
@@ -33,8 +33,6 @@ from .errors import *
 from .utils import asyncio, run_async
 
 LOGGER = getLogger(__name__)
-getLogger("googleapiclient.discovery").setLevel(WARNING)
-
 
 class AsyncGoogleDriver:
     def __init__(self):
@@ -90,13 +88,14 @@ class AsyncGoogleDriver:
                     "refresh_token": data.refresh_token,
                     "grant_type": "refresh_token",
                 }
+                self.__credntials = base64.b64encode(json.dumps(self.__credntials).encode()).decode()
 
     async def _lazy_load_sa(self, file_path: str) -> dict:
         if data := self.__service_accounts_data.get(file_path):
             return
         async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
             data = json.loads(await f.read())
-            self.__service_accounts_data[file_path] = data
+            self.__service_accounts_data[file_path] = base64.b64encode(json.dumps(data).encode()).decode()
             return
 
     @run_async
@@ -113,8 +112,10 @@ class AsyncGoogleDriver:
         }
         return jwt.encode(payload, private_key, algorithm="RS256")
 
-    # @timed_cache(seconds=3500) # every sa token is valid for 1hr so...
-    async def _fetch_token(self, credentials: dict, is_service_account: bool = False):
+    @timed_cache(seconds=3500) # every sa token is valid for 1hr so...
+    async def _fetch_token(self, credentials: str, is_service_account: bool = False):
+        credentials = json.loads(base64.b64decode(credentials).decode())
+
         if is_service_account:
             _jwt_payload = await self._generate_gcp_jwt(credentials)
             payload = {
