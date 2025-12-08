@@ -22,8 +22,11 @@ from libs.tracker.downloads import DownloadTracker
 from models import (
     FileFolderResponse,
     FilesFoldersListResponse,
+    FilesStatsResponse,
+    FileStatsResponse,
     Optional,
     SearchResponse,
+    Union,
 )
 
 logging.basicConfig(
@@ -46,6 +49,7 @@ async def lifespan(app):
     global driver
     driver = AsyncGoogleDriver()
     await driver._load_accounts()
+    await dlt.init_db()
     yield
     await driver._close_req_session()
 
@@ -85,12 +89,11 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
         )
 
     client_ip = request.client.host
-    dlt.track_download(file_id, user_ip=client_ip)
+    await dlt.track_download(file_id, user_ip=client_ip)
     log.info(f"Stream request for file {file_id} from IP {client_ip}")
 
     try:
         file_info = await driver.get_file_info(file_id)
-
         if file_info.get("mimeType") == "application/vnd.google-apps.folder":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -104,8 +107,8 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
             f"Traceback: {format_exc()}"
         )
         raise HTTPException(
-            status_code=getattr(e, "status", status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail=getattr(e, "reason", str(e)),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=getattr(e, "details", str(e)),
         )
 
     return await driver.stream_file(
@@ -127,12 +130,10 @@ async def file_info(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=getattr(
-                e.resp, "status", status.HTTP_500_INTERNAL_SERVER_ERROR
-            ),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "success": False,
-                "error": getattr(e, "reason", str(e)),
+                "error": getattr(e, "details", str(e)),
             },
         )
 
@@ -163,10 +164,10 @@ async def folders_in_root(
         )
     except BaseException as e:
         raise HTTPException(
-            status_code=getattr(e, "status", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "success": False,
-                "error": getattr(e, "reason", str(e)),
+                "error": getattr(e, "details", str(e)),
             },
         )
 
@@ -191,11 +192,42 @@ async def search(
         )
     except BaseException as e:
         raise HTTPException(
-            status_code=getattr(
-                e.resp, "status", status.HTTP_500_INTERNAL_SERVER_ERROR
-            ),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "success": False,
-                "error": getattr(e, "reason", str(e)),
+                "error": getattr(e, "details", str(e)),
+            },
+        )
+
+
+@app.get(
+    "/stats/downloads", response_model=Union[FilesStatsResponse, FileStatsResponse]
+)
+async def get_downloads_stats(
+    file_id: str = Query(None, description="Google Drive file ID"),
+    limit: int = Query(10, ge=1, le=50, description="Number of top files to retrieve"),
+    method: str = Query(
+        "trendingScore",
+        description="Method to sort files by (trendingScore or hotnessScore), These doesn't matter if file_id is given",
+    ),
+):
+    try:
+        data = (
+            await dlt.get_files_stats(limit=limit, method=method)
+            if not file_id
+            else await dlt.get_file_stats(file_id)
+        )
+        return JSONResponse(
+            {
+                "success": True,
+                "data": data,
+            }
+        )
+    except BaseException as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "success": False,
+                "error": str(e),
             },
         )

@@ -1,14 +1,20 @@
-class FailedToFetchToken(Exception):
+class DetailedException(Exception):
+    def __init__(self, details: dict):
+        self.details = details
+        super().__init__(str(details))
+
+
+class FailedToFetchToken(DetailedException):
     pass
 
 
-class FailedToFetchFileInfo(Exception):
+class FailedToFetchFileInfo(DetailedException):
     pass
 
 
-class FailedToFetchFilesTree(Exception):
+class FailedToFetchFilesTree(DetailedException):
     pass
 
 
-class FailedToFetchSearchResult(Exception):
+class FailedToFetchSearchResult(DetailedException):
     pass

@@ -4,5 +4,6 @@ test.*
 old.*
 *.pickle
 *.log
+*.db
 accounts/
 test/

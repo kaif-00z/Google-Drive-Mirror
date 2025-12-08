@@ -56,7 +56,7 @@ class AsyncGoogleDriver:
         ssl=None,
         *args,
         **kwargs,
-    ):
+    ) -> dict:
         if post:
             data = await self._requests_sessions.post(
                 url, headers=headers, json=json, data=data, ssl=ssl, *args, **kwargs
@@ -75,14 +75,14 @@ class AsyncGoogleDriver:
                 "error_details": str(err),
             }
 
-    async def _load_accounts(self):
+    async def _load_accounts(self) -> None:
         if Var.IS_SERVICE_ACCOUNT:
             procs = [self._lazy_load_sa(sa) for sa in glob("accounts/*.json")]
             await asyncio.gather(*procs)
         elif os.path.exists("token.pickle"):
             await self._lazy_load_pickle()
 
-    async def _lazy_load_pickle(self):
+    async def _lazy_load_pickle(self) -> None:
         async with aiofiles.open("token.pickle", "rb") as t:
             data = pickle.loads(await t.read())
             self.__credntials = {
@@ -104,7 +104,7 @@ class AsyncGoogleDriver:
             return
 
     @run_async
-    def _generate_gcp_jwt(self, sa_json):
+    def _generate_gcp_jwt(self, sa_json) -> str:
         now = int(time.time())
         private_key = sa_json["private_key"]
         client_email = sa_json["client_email"]
@@ -122,7 +122,7 @@ class AsyncGoogleDriver:
     @timed_cache(seconds=3500)
     async def _fetch_token(
         self, credentials: str = None, is_service_account: bool = False
-    ):
+    ) -> str:
 
         if is_service_account and credentials:
             credentials = json.loads(base64.b64decode(credentials).decode())
@@ -144,9 +144,9 @@ class AsyncGoogleDriver:
             if at := (res or {}).get("access_token"):
                 return at
 
-        raise FailedToFetchToken("Failed to fetch access token")
+        raise FailedToFetchToken(details=res)
 
-    async def _get_token(self, retry: int = 0):
+    async def _get_token(self, retry: int = 0) -> str:
         if self.__credntials:
             return await self._fetch_token()
 
@@ -169,7 +169,9 @@ class AsyncGoogleDriver:
             "Neither a service account nor a token.pickle file is available. Please configure authentication first!"
         )
 
-    async def stream_file(self, file_id: str, file: dict, range_header: int = 0):
+    async def stream_file(
+        self, file_id: str, file: dict, range_header: int = 0
+    ) -> StreamingResponse:
         url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 
         file_name = file["name"]
@@ -265,7 +267,7 @@ class AsyncGoogleDriver:
             if (res or {}).get("id"):
                 return res
 
-        raise FailedToFetchFileInfo(res)
+        raise FailedToFetchFileInfo(details=res)
 
     @timed_cache(seconds=300)  # 5 mins
     async def list_all(
@@ -273,7 +275,7 @@ class AsyncGoogleDriver:
         folder_id: str = Var.ROOT_FOLDER_ID,
         page_token: str = None,
         page_size: int = 50,
-    ):
+    ) -> dict:
 
         params = {
             "supportsAllDrives": "true",
@@ -306,10 +308,12 @@ class AsyncGoogleDriver:
             if "files" in (res or {}):
                 return res
 
-        raise FailedToFetchFilesTree(res)
+        raise FailedToFetchFilesTree(details=res)
 
     @timed_cache(seconds=300)  # 5mins
-    async def search_files_in_drive(self, query: str, page_token=None, page_size=50):
+    async def search_files_in_drive(
+        self, query: str, page_token=None, page_size=50
+    ) -> dict:
         query = query.strip().replace("'", "\\'")
 
         words = query.split()
@@ -352,7 +356,7 @@ class AsyncGoogleDriver:
             if "files" in (res or {}):
                 return res
 
-        raise FailedToFetchSearchResult(res)
+        raise FailedToFetchSearchResult(details=res)
 
     async def _close_req_session(self):
         await self._requests_sessions.close()
