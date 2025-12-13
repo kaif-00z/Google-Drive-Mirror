@@ -17,6 +17,7 @@ import os
 import pickle
 import random
 import time
+import re
 from glob import glob
 from logging import WARNING, getLogger
 
@@ -313,12 +314,19 @@ class AsyncGoogleDriver:
 
         raise FailedToFetchFilesTree(details=res)
 
+    @staticmethod
+    def _format_search_keyword(keyword):
+        if not keyword:
+            return ""
+        result = re.sub(r'(!=)|[\'"=<>/\\\\:]', '', keyword)
+        result = re.sub(r'[,，|(){}]', ' ', result)
+        return result.strip()
+
     @timed_cache(seconds=300)  # 5mins
     async def search_files_in_drive(
         self, query: str, page_token=None, page_size=50
     ) -> dict:
-        query = query.strip().replace("'", "\\'")
-
+        query = self._format_search_keyword(query)
         words = query.split()
         name_cond = " AND ".join([f"name contains '{w}'" for w in words])
 
