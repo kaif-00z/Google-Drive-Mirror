@@ -183,37 +183,42 @@ class AsyncGoogleDriver:
             or "application/octet-stream"
         )
 
-        headers = {"Authorization": f"Bearer {await self._get_token()}"}
+        headers = {}
 
         if range_header:
             headers["Range"] = str(range_header)
 
         res = None
         session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None))
-        for i in range(3):
+        for i in range(3): # will use recursion in future rather than this ugly for loop
             try:
-                # start = time.time()
-                # print(f"pre init debug {start}")
+                headers["Authorization"] = f"Bearer {await self._get_token()}"
                 res = await session.get(url, headers=headers)
                 if res.status in (200, 206):
-                    # print(f"post init track debug {(time.time() - start):.6f}s")
                     break
             except Exception as err:
                 LOGGER.error(str(err))
 
-        if res is None:
-            raise HTTPException(500, "Unknown error while contacting Google Drive")
+            if i >= 2:
+                if res is None:
+                    raise HTTPException(500, "Unknown error while contacting Google Drive")
 
-        if res.status == 404:
-            raise HTTPException(404, "File Not Found")
+                if res.status == 404:
+                    raise HTTPException(404, "File Not Found")
+                
+                if res.status == 401:
+                    raise HTTPException(401, "Token is expired!! Please check your authentications.")
+                
+                if res.status == 429:
+                    raise HTTPException(429, "Rate limit exceeded! use service accounts or add more to avoid this.")
 
-        if res.status == 403:
-            details = await res.text()
-            raise HTTPException(403, details)
+                details = await res.text()
 
-        if res.status not in (200, 206):
-            details = await res.text()
-            raise HTTPException(res.status, details)
+                if res.status == 403:
+                    raise HTTPException(403, details)
+
+                if res.status not in (200, 206):
+                    raise HTTPException(res.status, details)
 
         async def stream():
             try:
