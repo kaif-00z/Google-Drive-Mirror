@@ -1,5 +1,5 @@
-from tracker.downloads import DownloadTracker, Algorithms
-from tracker.users import UserTracker, Activities
+from libs.tracker.downloads import DownloadTracker, Algorithms
+from libs.tracker.users import UserTracker, Activities
 
 class Tracker:
     def __init__(self):
