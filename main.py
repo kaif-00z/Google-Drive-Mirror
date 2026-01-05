@@ -18,7 +18,7 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from gdrive import AsyncGoogleDriver
-from libs.tracker.downloads import DownloadTracker
+from libs.tracker import Tracker
 from models import (
     FileFolderResponse,
     FilesFoldersListResponse,
@@ -41,7 +41,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 global driver
-dlt = DownloadTracker()
+trk = Tracker()
 
 
 @asynccontextmanager
@@ -49,7 +49,7 @@ async def lifespan(app):
     global driver
     driver = AsyncGoogleDriver()
     await driver._load_accounts()
-    await dlt.init_db()
+    await trk.wake()
     yield
     await driver._requests_sessions.close()
 
@@ -89,7 +89,7 @@ async def stream_handler(request: Request, file_id: str) -> StreamingResponse:
         )
 
     client_ip = request.client.host
-    await dlt.track_download(file_id, user_ip=client_ip)
+    await trk.dl.track_download(file_id, user_ip=client_ip)
     log.info(f"Stream request for file {file_id} from IP {client_ip}")
 
     try:
@@ -213,9 +213,9 @@ async def get_downloads_stats(
 ):
     try:
         data = (
-            await dlt.get_files_stats(limit=limit, method=method)
+            await trk.dl.get_files_stats(limit=limit, method=method)
             if not file_id
-            else await dlt.get_file_stats(file_id)
+            else await trk.dl.get_file_stats(file_id)
         )
         return JSONResponse(
             {
