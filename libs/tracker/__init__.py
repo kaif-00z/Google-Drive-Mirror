@@ -10,6 +10,7 @@ class Tracker:
         await self._dl_t.init_db()
         await self._u_t.init_db()
 
+    # this "user" property gives access to user tracking functionalities but its not implemented in api interfaces yet but the backend is ready for future use.
     @property
     def user(self) -> UserTracker:
         return self._u_t

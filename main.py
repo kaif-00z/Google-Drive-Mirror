@@ -47,7 +47,7 @@ trk = Tracker()
 @asynccontextmanager
 async def lifespan(app):
     global driver
-    driver = AsyncGoogleDriver()
+    driver = AsyncGoogleDriver()  # Initialized here to ensure compatibility with ASGI servers (ex- Gunicorn + Uvicorn) and proper async context handling.
     await driver._load_accounts()
     await trk.wake()
     yield

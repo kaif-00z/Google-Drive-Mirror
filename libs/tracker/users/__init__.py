@@ -8,6 +8,8 @@
 # if you are using this following code then don't forgot to give proper
 # credit to t.me/kAiF_00z (github.com/kaif-00z)
 
+# this is implemented in api interfaces yet but the backend aka this is ready for future use.
+
 from datetime import datetime, timedelta
 import aiosqlite
 
