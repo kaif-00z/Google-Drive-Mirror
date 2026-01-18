@@ -44,7 +44,7 @@ class AsyncGoogleDriver:
         self.__service_accounts_data = {}
         self.__service_accounts_identifiers = []
         # for normal account
-        self.__credntials = None
+        self.__credentials = None
 
     async def _async_searcher(
         self,
@@ -69,7 +69,7 @@ class AsyncGoogleDriver:
 
         try:
             return await data.json()
-        except BaseException as err:
+        except Exception as err:
             return {
                 "error": "unable_to_fetch_data",
                 "error_description": "Unable to get json data",
@@ -86,13 +86,13 @@ class AsyncGoogleDriver:
     async def _lazy_load_pickle(self) -> None:
         async with aiofiles.open("token.pickle", "rb") as t:
             data = pickle.loads(await t.read())
-            self.__credntials = {
+            self.__credentials = {
                 "client_id": data.client_id,
                 "client_secret": data.client_secret,
                 "refresh_token": data.refresh_token,
                 "grant_type": "refresh_token",
             }
-            return self.__credntials
+            return self.__credentials
 
     async def _lazy_load_sa(self, file_path: str) -> dict:
         if data := self.__service_accounts_data.get(file_path):
@@ -148,7 +148,7 @@ class AsyncGoogleDriver:
         raise FailedToFetchToken(details=res)
 
     async def _get_token(self, retry: int = 0) -> str:
-        if self.__credntials:
+        if self.__credentials:
             return await self._fetch_token()
 
         if Var.IS_SERVICE_ACCOUNT and self.__service_accounts_data:
@@ -156,11 +156,13 @@ class AsyncGoogleDriver:
                 self.__service_accounts_identifiers = list(
                     self.__service_accounts_data.keys()
                 )
-            sad = self.__service_accounts_data[
+            service_account_data = self.__service_accounts_data[
                 random.choice(self.__service_accounts_identifiers)
             ]
             try:
-                return await self._fetch_token(sad, is_service_account=True)
+                return await self._fetch_token(
+                    service_account_data, is_service_account=True
+                )
             except FailedToFetchToken as err:
                 if retry >= 5:
                     raise err
@@ -225,7 +227,7 @@ class AsyncGoogleDriver:
                 async for chunk in res.content.iter_chunked(1024 * 1024):
                     if chunk:
                         yield chunk
-            except BaseException as e:
+            except Exception as e:
                 if isinstance(e, asyncio.CancelledError):
                     LOGGER.warning(
                         f"Client disconnected while streaming file {file_id}"
@@ -323,7 +325,7 @@ class AsyncGoogleDriver:
     def _format_search_keyword(keyword):
         if not keyword:
             return ""
-        result = re.sub(r'(!=)|[\'"=<>/\\\\:]', '', keyword)
+        result = re.sub(r'(!=)|[\'"=<>/\\:]', '', keyword)
         result = re.sub(r'[,，|(){}]', ' ', result)
         return result.strip()
 

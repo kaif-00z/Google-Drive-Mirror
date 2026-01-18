@@ -1,6 +1,6 @@
 # 🧪 Google Drive Indexer & Streamer
 
-> High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.
+> High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awesome Features & Stability.
 
 [![Python](https://img.shields.io/badge/Python-v3.14.0-blue)](https://www.python.org/)
 [![CodeFactor](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror/badge)](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror)

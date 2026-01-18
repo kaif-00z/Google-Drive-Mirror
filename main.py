@@ -56,7 +56,7 @@ async def lifespan(app):
 
 app = FastAPI(
     title="Google Drive Mirror",
-    summary="High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.",
+    summary="High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awesome Features & Stability.",
     version="v0.0.1@beta.1s",
     lifespan=lifespan,
     docs_url=None,
@@ -208,7 +208,7 @@ async def get_downloads_stats(
     limit: int = Query(10, ge=1, le=50, description="Number of top files to retrieve"),
     method: str = Query(
         "trendingScore",
-        description="Method to sort files by (trendingScore or hotnessScore), These doesn't matter if file_id is given",
+        description="Method to sort files by (trendingScore or hotnessScore), This doesn't matter if file_id is given",
     ),
 ):
     try:
