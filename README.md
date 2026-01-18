@@ -1,6 +1,6 @@
 # 🧪 Google Drive Indexer & Streamer
 
-> High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awsome Features & Stablility.
+> High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronously in Python with FastAPI With Awesome Features & Stability.
 
 [![Python](https://img.shields.io/badge/Python-v3.14.0-blue)](https://www.python.org/)
 [![CodeFactor](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror/badge)](https://www.codefactor.io/repository/github/kaif-00z/Google-Drive-Mirror)
@@ -34,7 +34,7 @@
 **NOTES**
 
 - Old authentication changed, now we can't use bot or replit to generate token.pickle. You need OS with a local browser. For example `Termux`.
-- Windows users should install python3 and pip. You can find how to install and use them from google or from this [telegraph](https://telegra.ph/Create-Telegram-Mirror-Leech-Bot-by-Deploying-App-with-Heroku-Branch-using-Github-Workflow-12-06) from [Wiszky](https://github.com/vishnoe115) tutorial.
+- Windows users should install python3 and pip. You can find how to install and use them from google.
 - You can ONLY open the generated link from `generate_drive_token.py` in local browser.
 
 1. Visit the [Google Cloud Console](https://console.developers.google.com/apis/credentials)
@@ -48,8 +48,10 @@
 9. Search for Google Drive Api and enable it
 10. Finally, run the script to generate **token.pickle** file for Google Drive:
 
+but you have to copy the files to generate stuffs from [here](https://github.com/SilentDemonSD/WZML-X/tree/wzv3/gen_scripts) to root of this folder.
+
 ```
-pip3 install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip3 install -r requirements-cli.txt
 python3 generate_drive_token.py
 ```
 </details>
@@ -171,22 +173,21 @@ python3 add_to_team_drive.py -d SharedTeamDriveSrcID
 
 ### OPTIONAL VARIABLES
 
-- `SERVER_SIDE_SPEED` - (1-100) MBs to manage server side chuncks yeild of streaming (default 25 MBps)`.
-
 - `IS_SERVICE_ACCOUNT` - `True/False` If you want to use mutiple service account, make sure u add all service accounts inside `accounts/` folder.
 
-- `HOST` - Configure if you want to run on specified host (default 0.0.0.0).
+- `HOST` - Configure if you want to run on specified host (default: 0.0.0.0).
 
-- `PORT` - Configure if you want to run on specified port (default 5000).
+- `PORT` - Configure if you want to run on specified port (default: 5000).
+
+- `MAX_REQ_BUFFER` - To restart each worker after processing x amount of requests (default: 10000)
 
 # License
 [![License](https://www.gnu.org/graphics/agplv3-155x51.png)](LICENSE)   
 Google-Drive-Mirror is licensed under [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.en.html) v3 or later.
 
 # Credits
-* [Me](https://github.com/kaif-00z)
-* [MLTB Devs](https://github.com/anasty17/mirror-leech-telegram-bot)
-* [WZML-X Devs](https://github.com/SilentDemonSD/WZML-X)
+* [Me 🕊](https://github.com/kaif-00z)
+* [MLTB / WZML-X Devs For Gen Snippets](https://github.com/SilentDemonSD/WZML-X/tree/wzv3/gen_scripts)
 
 ## Donate
 
