@@ -128,13 +128,22 @@ class UserTracker:
                     )
                 bandwidth_stats[name] = int((await bw_cursor.fetchone())[0] or 0)
             
-            bandwidth_stats["total"] = sum(bandwidth_stats.values())
+            if user_ip is None:
+                total_cursor = await db.execute(
+                    "SELECT SUM(bandwidth) FROM activity_logs"
+                )
+            else:
+                total_cursor = await db.execute(
+                    "SELECT SUM(bandwidth) FROM activity_logs WHERE user_ip = ?",
+                    (user_ip,)
+                )
+            bandwidth_stats["total"] = int((await total_cursor.fetchone())[0] or 0)
             return bandwidth_stats
 
     async def get_user_info(self, user_ip: str) -> dict:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
-                "SELECT user_ip, requests_count, downloads_count, bandwidth_usage, first_access, last_access, is_flagged FROM users WHERE user_ip = ?",
+                "SELECT user_ip, requests_count, downloads_count, first_access, last_access, is_flagged FROM users WHERE user_ip = ?",
                 (user_ip,),
             )
             if row := await cursor.fetchone():
