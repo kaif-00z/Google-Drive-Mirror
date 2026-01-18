@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from gdrive import AsyncGoogleDriver
 from libs.tracker import Tracker
+from libs.version import get_version_info
 from models import (
     FileFolderResponse,
     FilesFoldersListResponse,
@@ -57,7 +58,7 @@ async def lifespan(app):
 app = FastAPI(
     title="Google Drive Mirror",
     summary="High Speed Gdrive Mirror, Indexer & File Streamer Written Asynchronous in Python with FastAPI With Awesome Features & Stability.",
-    version="v0.0.1@beta.1s",
+    version=get_version_info(),
     lifespan=lifespan,
     docs_url=None,
     redoc_url=None,
